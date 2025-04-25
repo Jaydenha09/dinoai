@@ -58,14 +58,61 @@ INPUT_FRAMES = 3 # Number of frames stacked together as input
 class DinoGame():
     """Handles Chrome Dino game interactions using Selenium."""
     def __init__(self):
-        options = ChromeOptions()
-        # option.add_argument("--disable-gpu") # Often needed in headless/docker
-        options.add_argument("--no-sandbox") # Often needed in docker/linux
+        options = webdriver.ChromeOptions()
+        # option.add_argument("--headless") # Optional: uncomment to run headless
+        # option.add_argument("--disable-gpu") # Often needed with headless
+        options.add_argument("--no-sandbox") # Often needed in containerized/restricted environments
         options.add_argument("--disable-dev-shm-usage") # Overcome limited resource problems
-        # options.add_argument("--headless") # Uncomment to run without GUI
-        options.add_argument("--window-size=800,600") # Set a reasonable window size
-        self.driver = webdriver.Chrome(options=options)
-        self.observation_space = (IMG_SIZE, IMG_SIZE) # Define observation space dims
+
+        # --- Get paths from environment variables ---
+        chrome_bin_path = os.getenv('CHROME_BIN_PATH')
+        chromedriver_path = os.getenv('CHROMEDRIVER_PATH')
+
+        service = None # Initialize service as None
+
+        # Configure Chrome Binary Location if CHROME_BIN_PATH is set
+        if chrome_bin_path:
+            print(f"Using Chrome binary from CHROME_BIN_PATH: {chrome_bin_path}")
+            options.binary_location = chrome_bin_path
+        else:
+            print("CHROME_BIN_PATH not set. Using default Chrome location.")
+
+        # Configure ChromeDriver path if CHROMEDRIVER_PATH is set
+        if chromedriver_path:
+            print(f"Using ChromeDriver from CHROMEDRIVER_PATH: {chromedriver_path}")
+            # Use the Service object to specify the ChromeDriver path
+            try:
+                service = ChromeService(executable_path=chromedriver_path)
+            except Exception as e:
+                print(f"Error creating Chrome Service with path {chromedriver_path}: {e}")
+                print("Ensure the path is correct and the chromedriver executable exists and is executable.")
+                raise
+        else:
+            print("CHROMEDRIVER_PATH not set. Assuming chromedriver is in PATH.")
+            # If not set, Selenium will try to find chromedriver in the system PATH
+
+        # --- Initialize the driver ---
+        try:
+            # Pass both service and options. If service is None, Selenium uses default behavior.
+            print("Initializing WebDriver...")
+            self.driver = webdriver.Chrome(service=service, options=options)
+            print("WebDriver initialized successfully.")
+        except WebDriverException as e:
+            print(f"Error initializing Chrome Driver: {e}")
+            if not chromedriver_path:
+                 print("Ensure chromedriver is installed and in your system PATH.")
+            if not chrome_bin_path:
+                 print("Ensure Chrome browser is installed in the default location.")
+            if service and not service.is_connectable():
+                 print(f"Could not connect to ChromeDriver Service at {chromedriver_path}")
+
+            # Add more specific guidance based on common errors
+            if "executable needs to be in PATH" in str(e) and not chromedriver_path:
+                 print("TIP: Set the CHROMEDRIVER_PATH environment variable or add its directory to the system PATH.")
+            if "cannot find chrome binary" in str(e) and not chrome_bin_path:
+                 print("TIP: Set the CHROME_BIN_PATH environment variable or ensure Chrome is installed correctly.")
+
+            raise # Re-raise the exception after printing helpful messages
 
     def open(self):
         """Navigates the browser to the Chrome Dino game."""
