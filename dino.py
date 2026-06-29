@@ -116,7 +116,10 @@ class DinoGame():
 
     def open(self):
         """Navigates the browser to the Chrome Dino game."""
-        self.driver.get('chrome://dino')
+        try:
+            self.driver.get('chrome://dino')
+        except WebDriverException:
+            pass
         # Wait a bit for the game to load - adjust if needed
         sleep(1)
 
